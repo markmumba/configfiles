@@ -1,0 +1,132 @@
+---
+- name: Setup my new Fedora laptop
+  hosts: localhost # Target your local machine
+  become: true # Use sudo privileges for installations
+
+  tasks:
+    - name: Update and upgrade existing packages
+      dnf:
+        name: "*"
+        state: latest
+
+    - name: Install common dependencies
+      dnf:
+        name:
+          - git
+          - curl
+          - wget
+          - make
+          - gcc
+          - gcc-c++
+          - kernel-devel
+
+    - name: Install zsh
+      dnf:
+        name: zsh
+        state: present
+
+    - name: Install oh-my-zsh
+      shell: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+      args:
+        creates: ~/.oh-my-zsh # Check if oh-my-zsh is already installed
+
+    # - name: Set default Zsh plugins directory
+    #   environment:
+    #     ZSH_CUSTOM: ~/.oh-my-zsh/custom/plugins
+    
+    - name: Clone zsh-autosuggestions
+      git:
+        repo: https://github.com/zsh-users/zsh-autosuggestions.git
+        dest: "{{ ZSH_CUSTOM }}/zsh-autosuggestions"
+    
+    - name: Clone zsh-syntax-highlighting
+      git:
+        repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
+        dest: "{{ ZSH_CUSTOM }}/zsh-syntax-highlighting"
+    
+    - name: Clone fast-syntax-highlighting
+      git:
+        repo: https://github.com/zdharma-continuum/fast-syntax-highlighting.git
+        dest: "{{ ZSH_CUSTOM }}/fast-syntax-highlighting"
+    
+    - name: Clone zsh-autocomplete
+      git:
+        repo: https://github.com/marlonrichert/zsh-autocomplete.git
+        dest: "{{ ZSH_CUSTOM }}/zsh-autocomplete"
+        depth: 1
+    
+    - name: Configure Zsh plugins
+      lineinfile:
+        path: ~/.zshrc
+        line: "plugins=(git zsh-autosuggestions zsh-syntax-highlighting fast-syntax-highlighting zsh-autocomplete golang)"
+        state: present
+        create: yes
+    
+    - name: Install astronavim
+      git:
+        repo: https://github.com/AstroNvim/AstroNvim.git
+        dest: ~/.config/nvim
+        update: yes
+    
+    - name: Install Node.js
+      dnf:
+        name: nodejs
+        state: present
+    
+    - name: Install Golang
+      shell: |
+        VERSION=$(curl -sLf https://go.dev/VERSION?m=text)
+        wget https://golang.org/dl/$VERSION.linux-amd64.tar.gz
+        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf $VERSION.linux-amd64.tar.gz
+        rm $VERSION.linux-amd64.tar.gz
+      environment: # Set environment variables for Go installation
+        PATH: "{{ lookup('env', 'PATH') }}:/usr/local/go/bin"
+    
+    - name: Install Rust
+      shell: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+      args:
+        creates: ~/.cargo/bin/rustc # Verify if Rust isn't already installed
+    
+    - name: Install Visual Studio Code
+      dnf:
+        name: https://code.visualstudio.com/sha/download?build=stable&os=linux-rpm-x64
+        state: present
+    
+    - name: Install Docker
+      dnf:
+        name:
+          - docker
+          - docker-compose
+        state: present
+    
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+    
+    - name: Install Kubernetes (kubectl)
+      shell: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+    
+    - name: Install PostgreSQL
+      dnf:
+        name: postgresql-server
+        state: present
+    
+    - name: Initialize and start PostgreSQL database
+      become: true
+      become_user: postgres
+      command: postgresql-setup --initdb
+    
+    - name: Start and enable PostgreSQL service
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+    
+    - name: Install tmux
+      dnf:
+        name: tmux
+        state: present
